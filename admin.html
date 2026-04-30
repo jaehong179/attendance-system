@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR 출결 관리자</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      background: #f0f4ff;
+      min-height: 100vh;
+      padding: 32px 20px;
+    }
+
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .header h1 { font-size: 24px; color: #1a1a2e; margin-bottom: 4px; }
+    .header p  { font-size: 14px; color: #888; }
+
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      padding: 28px 24px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 15px;
+      border: 2px solid #e0e7ff;
+      border-radius: 10px;
+      outline: none;
+      transition: border 0.2s;
+      margin-bottom: 14px;
+    }
+
+    input[type="text"]:focus { border-color: #4f46e5; }
+
+    .url-preview {
+      background: #f8faff;
+      border: 1px solid #e0e7ff;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #6366f1;
+      word-break: break-all;
+      margin-bottom: 16px;
+      min-height: 36px;
+    }
+
+    .btn-generate {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-generate:hover { background: #4338ca; }
+
+    /* QR 결과 */
+    #qr-result { display: none; }
+
+    .qr-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 24px;
+      background: #fafbff;
+      border-radius: 16px;
+      border: 2px dashed #c7d2fe;
+      margin-bottom: 16px;
+    }
+
+    .qr-label {
+      font-size: 16px;
+      font-weight: 700;
+      color: #4f46e5;
+    }
+
+    #qrcode canvas, #qrcode img {
+      border-radius: 8px;
+    }
+
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn-secondary {
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      background: #f0f4ff;
+      color: #4f46e5;
+      border: 2px solid #c7d2fe;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .btn-secondary:hover { background: #e0e7ff; }
+
+    /* 설정 카드 */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+      color: #444;
+    }
+
+    .setting-row:last-child { border-bottom: none; }
+
+    .setting-row input[type="text"] {
+      width: 220px;
+      margin-bottom: 0;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .badge {
+      font-size: 11px;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>🖨️ QR 출결 관리자</h1>
+    <p>수업별 QR 코드를 생성하고 출력하세요</p>
+  </div>
+
+  <!-- 설정 카드 -->
+  <div class="card">
+    <h2>⚙️ 기본 설정</h2>
+    <div class="setting-row">
+      <span>Vercel 배포 URL <span class="badge">필수</span></span>
+      <input type="text" id="base-url" placeholder="https://yourapp.vercel.app" oninput="updatePreview()" />
+    </div>
+  </div>
+
+  <!-- QR 생성 카드 -->
+  <div class="card">
+    <h2>📌 QR 코드 생성</h2>
+
+    <label>수업명 / 장소명</label>
+    <input type="text" id="class-name" placeholder="예: 안전교육, 2팀 조회" oninput="updatePreview()" />
+
+    <label>접속 URL 미리보기</label>
+    <div class="url-preview" id="url-preview">URL이 여기에 표시됩니다</div>
+
+    <button class="btn-generate" onclick="generateQR()">QR 코드 생성</button>
+  </div>
+
+  <!-- QR 결과 -->
+  <div class="card" id="qr-result">
+    <h2>✅ 생성된 QR 코드</h2>
+
+    <div class="qr-box">
+      <div class="qr-label" id="qr-class-label"></div>
+      <div id="qrcode"></div>
+      <div style="font-size:12px; color:#aaa;">핸드폰 기본 카메라로 스캔하세요</div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn-secondary" onclick="printQR()">🖨️ 인쇄하기</button>
+      <button class="btn-secondary" onclick="downloadQR()">💾 이미지 저장</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let qrInstance = null;
+
+  function getBaseUrl() {
+    return document.getElementById('base-url').value.trim().replace(/\/$/, '');
+  }
+
+  function getClassName() {
+    return document.getElementById('class-name').value.trim();
+  }
+
+  function buildUrl() {
+    const base = getBaseUrl();
+    const cls  = getClassName();
+    if (!base) return '';
+    const encoded = cls ? '?class=' + encodeURIComponent(cls) : '';
+    return base + encoded;
+  }
+
+  function updatePreview() {
+    const url = buildUrl();
+    document.getElementById('url-preview').textContent = url || 'URL이 여기에 표시됩니다';
+  }
+
+  function generateQR() {
+    const url = buildUrl();
+    if (!url) {
+      alert('Vercel 배포 URL을 먼저 입력해주세요.');
+      return;
+    }
+
+    const cls = getClassName() || '출결 시스템';
+
+    // 이전 QR 제거
+    const container = document.getElementById('qrcode');
+    container.innerHTML = '';
+    if (qrInstance) qrInstance = null;
+
+    // QR 생성
+    qrInstance = new QRCode(container, {
+      text      : url,
+      width     : 220,
+      height    : 220,
+      colorDark : '#1a1a2e',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    document.getElementById('qr-class-label').textContent = cls;
+    document.getElementById('qr-result').style.display = 'block';
+    document.getElementById('qr-result').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function printQR() {
+    window.print();
+  }
+
+  function downloadQR() {
+    const canvas = document.querySelector('#qrcode canvas');
+    if (!canvas) { alert('QR 코드를 먼저 생성하세요.'); return; }
+
+    const cls = getClassName() || 'qr';
+    const link = document.createElement('a');
+    link.download = cls + '_QR.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+</script>
+
+<!-- 인쇄 스타일 -->
+<style>
+  @media print {
+    body { background: #fff; padding: 0; }
+    .header, #qr-result ~ *, .btn-generate, .btn-group,
+    .card:not(#qr-result), .setting-row { display: none !important; }
+    #qr-result {
+      display: block !important;
+      box-shadow: none;
+      border: none;
+    }
+    .qr-box { border: 2px solid #ccc; }
+  }
+</style>
+
+</body>
+</html>

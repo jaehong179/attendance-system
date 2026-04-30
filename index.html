@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>출결 체크</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      background: #f0f4ff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+      padding: 40px 32px 36px;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+
+    .icon { font-size: 48px; margin-bottom: 12px; }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 4px;
+    }
+
+    .class-name {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 32px;
+    }
+
+    label {
+      display: block;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 18px;
+      border: 2px solid #e0e7ff;
+      border-radius: 12px;
+      outline: none;
+      transition: border 0.2s;
+      letter-spacing: 2px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    input[type="text"]:focus { border-color: #4f46e5; }
+
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      padding: 16px 8px;
+      font-size: 18px;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-in {
+      background: #4f46e5;
+      color: #fff;
+    }
+
+    .btn-out {
+      background: #f0f4ff;
+      color: #4f46e5;
+      border: 2px solid #c7d2fe;
+    }
+
+    .save-hint {
+      font-size: 12px;
+      color: #bbb;
+      margin-top: 4px;
+    }
+
+    /* 결과 화면 */
+    #result {
+      display: none;
+    }
+
+    .result-icon { font-size: 64px; margin-bottom: 16px; }
+
+    .result-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .result-title.in  { color: #4f46e5; }
+    .result-title.out { color: #059669; }
+
+    .result-info {
+      font-size: 14px;
+      color: #888;
+      line-height: 1.8;
+      margin-bottom: 28px;
+    }
+
+    .btn-again {
+      width: 100%;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #f0f4ff;
+      color: #4f46e5;
+      border: 2px solid #c7d2fe;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    /* 로딩 스피너 */
+    .spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 에러 메시지 */
+    .error-msg {
+      display: none;
+      background: #fee2e2;
+      color: #dc2626;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- 입력 화면 -->
+  <div id="form-section">
+    <div class="icon">📋</div>
+    <h1>출결 체크</h1>
+    <p class="class-name" id="class-label">로딩 중...</p>
+
+    <label for="emp-id">사번 입력</label>
+    <input
+      type="text"
+      id="emp-id"
+      placeholder="사번을 입력하세요"
+      inputmode="numeric"
+      autocomplete="off"
+      maxlength="20"
+    />
+
+    <div class="error-msg" id="error-msg">⚠️ 사번을 입력해주세요.</div>
+
+    <div class="btn-group">
+      <button class="btn btn-in"  onclick="submit('입실')">🟢 입실</button>
+      <button class="btn btn-out" onclick="submit('퇴실')">🔴 퇴실</button>
+    </div>
+
+    <p class="save-hint">사번은 이 기기에 자동 저장됩니다</p>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div id="result">
+    <div class="result-icon" id="result-icon"></div>
+    <div class="result-title" id="result-title"></div>
+    <div class="result-info" id="result-info"></div>
+    <button class="btn-again" onclick="reset()">↩ 다시 체크하기</button>
+  </div>
+
+</div>
+
+<script>
+  // ─── 설정 ─────────────────────────────────────────────
+  // 1) Apps Script 배포 URL을 여기에 넣으세요
+  const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
+  // ──────────────────────────────────────────────────────
+
+  const input   = document.getElementById('emp-id');
+  const errMsg  = document.getElementById('error-msg');
+  const clsLabel = document.getElementById('class-label');
+
+  // URL 파라미터에서 수업명 읽기
+  const params    = new URLSearchParams(window.location.search);
+  const className = params.get('class') || '출결 시스템';
+  clsLabel.textContent = className;
+
+  // 저장된 사번 불러오기 (localStorage)
+  const saved = localStorage.getItem('emp_id');
+  if (saved) input.value = saved;
+
+  // 엔터키 지원
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') submit('입실');
+  });
+
+  async function submit(type) {
+    const empId = input.value.trim();
+
+    if (!empId) {
+      errMsg.style.display = 'block';
+      input.focus();
+      return;
+    }
+    errMsg.style.display = 'none';
+
+    // 사번 저장
+    localStorage.setItem('emp_id', empId);
+
+    // 버튼 비활성화
+    document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+
+    const now = new Date();
+    const query = new URLSearchParams({
+      emp_id   : empId,
+      class    : className,
+      type     : type,
+      timestamp: now.toISOString()
+    }).toString();
+
+    // Apps Script로 전송 (no-cors: 응답 못 읽어도 데이터는 기록됨)
+    try {
+      await fetch(APPS_SCRIPT_URL + '?' + query, { mode: 'no-cors' });
+    } catch (_) {
+      // no-cors 환경에서 에러는 무시
+    }
+
+    showResult(type, empId, now);
+  }
+
+  function showResult(type, empId, now) {
+    document.getElementById('form-section').style.display = 'none';
+
+    const isIn     = type === '입실';
+    const icon     = isIn ? '✅' : '👋';
+    const titleEl  = document.getElementById('result-title');
+    const timeStr  = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dateStr  = now.toLocaleDateString('ko-KR');
+
+    document.getElementById('result-icon').textContent = icon;
+    titleEl.textContent  = type + ' 완료!';
+    titleEl.className    = 'result-title ' + (isIn ? 'in' : 'out');
+    document.getElementById('result-info').innerHTML =
+      `사번 &nbsp;<strong>${empId}</strong><br>${className}<br>${dateStr} ${timeStr}`;
+
+    document.getElementById('result').style.display = 'block';
+  }
+
+  function reset() {
+    document.getElementById('result').style.display = 'none';
+    document.getElementById('form-section').style.display = 'block';
+    document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+  }
+</script>
+
+</body>
+</html>
